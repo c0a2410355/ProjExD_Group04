@@ -35,6 +35,7 @@ class Player:
         self.mana = 0
         self.max_mana = 0
         self.field = [] # 場に出ているCreatureオブジェクトのリスト
+        self.go = ""
 
     def draw_card(self):
         """山札からカードを引く"""
@@ -116,7 +117,10 @@ class Game:
         if self.turn_count >= 1 or (self.turn_count == 1 and self.current_turn_player == self.player2):
             if not player.draw_card():
                 # ドロー失敗で山札切れ負け
-                return self.check_win_condition() 
+                if player == self.player1:
+                    return "Player 2 Win (Deck Out)"
+                else:
+                    return "Player 1 Win (Deck Out)"
 
         # クリーチャーのフラグ更新
         for creature in player.field:
@@ -136,6 +140,19 @@ class Game:
         # 実際にはドロー時の山札切れチェックも必要
         return None
 
+class ScreenManager:
+    """タイトル / メイン / リザルト の状態を管理するクラス"""
+    def __init__(self):
+        self.state = "START"  # START / MAIN / RESULT
+        self.result_message = ""
+
+    def to_main(self):
+        self.state = "MAIN"
+
+    def to_result(self, msg):
+        self.result_message = msg
+        self.state = "RESULT"
+
 import pygame
 import sys
 # Gameクラス、Playerクラスなどは上記で定義済みとする
@@ -154,7 +171,12 @@ RED = (200, 50, 50)
 BLUE = (50, 50, 200)
 GREEN = (100,200,100)
 YELLOW = (150,150,50)
+GRAY = (150,150,150)
+
 FONT = pygame.font.SysFont("hgp創英角ﾎﾟｯﾌﾟ体", 20)
+TITLE_FONT = pygame.font.SysFont("hgp創英角ﾎﾟｯﾌﾟ体", 64)
+SMALL_FONT = pygame.font.SysFont("hgp創英角ﾎﾟｯﾌﾟ体", 28)
+
 
 # --- 描画ユーティリティ関数 ---
 def draw_card_on_screen(screen, card_obj, x, y, is_creature=False, is_tapped=False):
@@ -164,7 +186,7 @@ def draw_card_on_screen(screen, card_obj, x, y, is_creature=False, is_tapped=Fal
     # 基本の描画
     color = BLUE if not is_creature else (100, 200, 100)
     if is_tapped:
-        color = (150, 150, 150) # タップしている場合は灰色に
+        color = GRAY # タップしている場合は灰色に
     pygame.draw.rect(screen, color, card_rect, border_radius=5)
     
     # 情報の描画
@@ -191,9 +213,29 @@ def draw_player_status(screen, player, x, y,current):
     screen.blit(life_text, (x, y))
     screen.blit(mana_text, (x, y + 30))
     screen.blit(go_text, (x, y + 60))
+
+def draw_title_screen(screen):
+    screen.fill((30, 80, 30))
+    title = TITLE_FONT.render("Kokaton Master's", True, WHITE)
+    hint = SMALL_FONT.render("クリックしてゲームを始める！", True, YELLOW)
+    screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 220))
+    screen.blit(hint, (SCREEN_WIDTH//2 - hint.get_width()//2, 320))
+
+def draw_result_screen(screen, result_message):
+    screen.fill((20, 20, 40))
+    title = TITLE_FONT.render("Game End", True, WHITE)
+    # 表示は英語指定（あなたが YES にした通り）
+    body = SMALL_FONT.render(result_message, True, YELLOW)
+    hint = FONT.render("クリックすると終了します", True, WHITE)
+    screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 220))
+    screen.blit(body, (SCREEN_WIDTH//2 - body.get_width()//2, 320))
+    screen.blit(hint, (SCREEN_WIDTH//2 - hint.get_width()//2, 380))
+
 # --- メインゲームループ ---
 def run_game():
-    game = Game()
+    clock = pygame.time.Clock()
+    screenManager = ScreenManager()
+    game = None
     running = True
     
     # 選択中のカード/クリーチャーを管理する変数
